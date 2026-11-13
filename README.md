@@ -86,12 +86,13 @@ export GEMINI_API_KEY=xxxxxxxx      # https://aistudio.google.com/apikey で発�
 node tools/gen-tts.mjs              # 未作成のものだけ生成
 node tools/gen-tts.mjs --force      # 全部作り直す
 node tools/gen-tts.mjs --only call_02,follow_01
-node tools/gen-tts.mjs --voice Puck --style "元気いっぱいに、ゆっくり"
+node tools/gen-tts.mjs --voice Achird --style "元気いっぱいに、ゆっくり"
 node tools/gen-tts.mjs --dry-run    # 送信内容だけ確認
 ```
 
 - 声・話し方・モデルの既定値は `tools/tts.config.json`（全フレーズ共通）
-  - `voice`：既定 `Leda`（Youthful）。ほかに `Puck`（Upbeat）、`Laomedeia`（Upbeat）、`Achird`（Friendly）、`Sadachbia`（Lively）、`Zephyr`（Bright）など 30 種
+  - `voice`：既定 `Puck`（男性・Upbeat）。ほかの男性の声は `Achird`（Friendly）、`Sadachbia`（Lively）、`Fenrir`（Excitable）、`Umbriel`（Easy-going）など。全 30 種
+  - 声を聴き比べるときは `node tools/gen-tts.mjs --only call_01 --voice Achird` のように 1 件だけ作り直す
   - `style`：話し方の指示。本文には混ぜず `speech_metadata.style` として渡します（本文はそのまま読まれるため）
   - `model`：既定 `gemini-3.8-flash-tts`。安く速くしたいときは `gemini-3.8-flash-lite-tts`
 - API は Gemini Interactions API（`POST /v1beta/interactions`）。2026年11月時点の公式ドキュメント

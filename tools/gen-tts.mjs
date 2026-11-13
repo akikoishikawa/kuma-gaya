@@ -6,7 +6,7 @@
 //   node tools/gen-tts.mjs                          # 未作成のものだけ生成
 //   node tools/gen-tts.mjs --force                  # 全部作り直す
 //   node tools/gen-tts.mjs --only call_01,follow_02 # 指定したものだけ（既存も上書き）
-//   node tools/gen-tts.mjs --voice Puck --style "元気いっぱいに"
+//   node tools/gen-tts.mjs --voice Achird --style "元気いっぱいに"
 //   node tools/gen-tts.mjs --dry-run                # 送信内容を表示するだけ
 //
 // 声・話し方・モデルの既定値は tools/tts.config.json。全フレーズ共通で使う。
