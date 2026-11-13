@@ -2,7 +2,7 @@
   { "id": "call_01", "category": "call", "file": "call_01.wav", "text": "こんにちは！ちょっとだけ寄っていってよ" },
   { "id": "call_02", "category": "call", "file": "call_02.wav", "text": "ねえねえ、きみの町にもクマ出てるかも。調べてみる？" },
   { "id": "call_03", "category": "call", "file": "call_03.wav", "text": "熊出没マップ、くまウォッチだよ。見てみてね" },
-  { "id": "call_04", "category": "call", "file": "call_04.wav", "text": "熊対策ゲームもあるよ。熊対策を楽しく学ぼう" },
+  { "id": "call_04", "category": "call", "file": "call_04.wav", "text": "熊対策ゲームもあるよ。熊対策を楽しく学ぼう", "tts": "くま対策ゲームもあるよ。くま対策を楽しく学ぼう" },
   { "id": "call_05", "category": "call", "file": "call_05.wav", "text": "ぼくの仲間の出没情報、ここで見られるよ" },
   { "id": "call_06", "category": "call", "file": "call_06.wav", "text": "熊対策グッズの広告も置けるよ" },
   { "id": "follow_01", "category": "followup", "file": "follow_01.wav", "text": "画面で地図を見てみてね。近くの出没情報がわかるよ" },

@@ -75,6 +75,7 @@ tools/tts.config.json  TTS の声・話し方・モデル
 ```
 
 - `category`：`call`（呼びかけ）／`followup`（2段目）
+- `tts`（任意）：読み上げ用の文字。イントネーションや読みがおかしいときに、`text` はそのままでここだけ変える（例：「熊対策」→「くま対策」）
 - 形式は WAV 推奨（mp3 / m4a も可。`file` の拡張子を合わせる）
 - 音声ファイルがないフレーズは、読み上げフォールバックが ON なら `text` を読み上げ、OFF なら選ばれません
 - 音声を足したり差し替えたりして配信し直すときは、**`sw.js` の `VERSION` を上げる**（端末のキャッシュを入れ替えるため）
@@ -95,7 +96,7 @@ node tools/gen-tts.mjs --dry-run                                    # 送信内�
 - 課金先のプロジェクトでは `texttospeech.googleapis.com` と `aiplatform.googleapis.com` を有効にしておく（`kinetone` は有効済み）
 - **作り直しは `--only` で 1 件ずつが基本。**声は生成のたびに少し変わるので、`--force` で全部作り直すと気に入っていた音声まで変わります
 - 声・話し方・速さの既定値は `tools/tts.config.json`（全フレーズ共通）
-  - `voice`：既定 `Puck`（男性・Upbeat）。ほかの男性の声は `Achird`（Friendly）、`Sadachbia`（Lively）、`Fenrir`（Excitable）、`Umbriel`（Easy-going）など
+  - `voice`：既定 `Umbriel`（男性・Easy-going）。ほかの男性の声は `Puck`（Upbeat）、`Achird`（Friendly）、`Sadachbia`（Lively）、`Fenrir`（Excitable）など
   - `style`：話し方の指示（英語のほうが効く）。本文はそのまま読ませ、話し方だけを指示する文に組み込んで渡します
   - `rate`：読む速さ（既定 0.9 ＝ 少しゆっくり）
 - 作ったあと自動で確かめ、だめなら最大 4 回まで録り直します（kinetone-aiube の検査を移植）

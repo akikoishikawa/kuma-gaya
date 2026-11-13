@@ -3,3 +3,4 @@ certs/
 .DS_Store
 node_modules/
 .claude/
+tts-trials/

@@ -1,7 +1,7 @@
 {
   "provider": "cloud-tts",
   "model": "gemini-2.5-flash-tts",
-  "voice": "Puck",
+  "voice": "Umbriel",
   "rate": 0.9,
   "style": "a cheerful, friendly young boy bear mascot; bright and approachable; speak slowly and clearly, with a warm smile in the voice.",
   "delayMs": 1500,

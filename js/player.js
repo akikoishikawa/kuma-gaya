@@ -144,7 +144,7 @@ export class Player {
     this.current = { ...p, source };
     try {
       if (source === 'file') await this.playBuffer(this.buffers.get(p.id));
-      else await this.speak(p.text);
+      else await this.speak(p.tts || p.text);
       this.lastPlayedId = p.id;
       return true;
     } finally {

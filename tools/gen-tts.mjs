@@ -9,6 +9,7 @@
 //   GOOGLE_TTS_PROJECT=kinetone node tools/gen-tts.mjs --force         # 全部作り直す（声は毎回少し変わるので注意）
 //   node tools/gen-tts.mjs --voice Achird --only call_01               # 声を変えて試す
 //   node tools/gen-tts.mjs --dry-run                                  # 送信内容を表示するだけ
+//   node tools/gen-tts.mjs --only call_01 --voice Achird --out-dir tts-trials/Achird   # 試作（audio/ は触らない）
 //
 // Gemini API（API キー）で作る場合：GEMINI_API_KEY=... node tools/gen-tts.mjs --provider gemini-api
 //
@@ -37,6 +38,7 @@ const rate = Number(opt('rate') ?? config.rate ?? 1);
 const delayMs = Number(config.delayMs ?? 1500);
 const only = opt('only')?.split(',').map((s) => s.trim()).filter(Boolean);
 const force = flag('force') || !!only;
+const outDir = path.resolve(root, opt('out-dir') || 'audio');
 const dryRun = flag('dry-run');
 const TAKES = 4; // 出来上がりの確認で弾かれたときの録り直し上限
 
@@ -249,27 +251,27 @@ if (!dryRun) {
   }
 }
 
-await fs.mkdir(path.join(root, 'audio'), { recursive: true });
+await fs.mkdir(outDir, { recursive: true });
 let made = 0;
 let failed = 0;
 for (const p of targets) {
-  const out = path.join(root, 'audio', p.file);
+  const out = path.join(outDir, p.file);
   if (!/\.wav$/i.test(p.file)) console.warn(`- ${p.id}: ファイル名が .wav ではありません（${p.file}）。中身は WAV で書き出します`);
   if (!force && await fs.stat(out).then(() => true, () => false)) {
     console.log(`- ${p.id}: 既にあるのでスキップ（--only か --force で作り直し）`);
     continue;
   }
   if (dryRun) {
-    console.log(`- ${p.id}:`, JSON.stringify(provider === 'gemini-api' ? apiRequest(p.text) : cloudRequest(p.text)));
+    console.log(`- ${p.id}:`, JSON.stringify(provider === 'gemini-api' ? apiRequest(p.tts || p.text) : cloudRequest(p.tts || p.text)));
     continue;
   }
   try {
     const takes = [];
     let chosen = null;
     for (let i = 1; i <= TAKES; i++) {
-      let wav = await withRetry(p.text);
+      let wav = await withRetry(p.tts || p.text);
       if (!isWav(wav)) wav = pcmToWav(wav);
-      const check = inspect(wav, p.text);
+      const check = inspect(wav, p.tts || p.text);
       takes.push({ wav, ...check });
       if (!check.why) {
         chosen = takes.at(-1);
@@ -281,7 +283,7 @@ for (const p of targets) {
     const take = chosen ?? takes.sort((a, b) => a.sec - b.sec)[0];
     await fs.writeFile(out, take.wav);
     made++;
-    console.log(`${chosen ? '✓' : '!'} ${p.id}  ${take.sec.toFixed(2)}秒  ${p.text}`);
+    console.log(`${chosen ? '✓' : '!'} ${p.id}  ${take.sec.toFixed(2)}秒  ${p.tts || p.text}`);
     if (!chosen) console.log(`  （${TAKES} 回試して確認を通りませんでした。聞いて確かめてください）`);
   } catch (e) {
     failed++;
