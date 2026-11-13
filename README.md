@@ -79,26 +79,32 @@ tools/tts.config.json  TTS の声・話し方・モデル
 - 音声ファイルがないフレーズは、読み上げフォールバックが ON なら `text` を読み上げ、OFF なら選ばれません
 - 音声を足したり差し替えたりして配信し直すときは、**`sw.js` の `VERSION` を上げる**（端末のキャッシュを入れ替えるため）
 
-### Gemini TTS で一括生成する
+### Gemini の声で一括生成する
+
+既定は Google Cloud Text-to-Speech の Gemini TTS（`gemini-2.5-flash-tts`）です。
+kinetone の `@kinetone/voice` と同じ方式で、認証は gcloud、課金先はプロジェクトを明示します。
 
 ```bash
-export GEMINI_API_KEY=xxxxxxxx      # https://aistudio.google.com/apikey で発行。リポジトリには入れない
-node tools/gen-tts.mjs              # 未作成のものだけ生成
-node tools/gen-tts.mjs --force      # 全部作り直す
-node tools/gen-tts.mjs --only call_02,follow_01
-node tools/gen-tts.mjs --voice Achird --style "元気いっぱいに、ゆっくり"
-node tools/gen-tts.mjs --dry-run    # 送信内容だけ確認
+gcloud auth application-default login          # 初回だけ（ブラウザでサインイン）
+GOOGLE_TTS_PROJECT=kinetone node tools/gen-tts.mjs                  # 未作成のものだけ生成
+GOOGLE_TTS_PROJECT=kinetone node tools/gen-tts.mjs --only call_02   # 指定したものだけ作り直す
+GOOGLE_TTS_PROJECT=kinetone node tools/gen-tts.mjs --only call_01 --voice Achird   # 声を試す
+node tools/gen-tts.mjs --dry-run                                    # 送信内容だけ確認
 ```
 
-- 声・話し方・モデルの既定値は `tools/tts.config.json`（全フレーズ共通）
-  - `voice`：既定 `Puck`（男性・Upbeat）。ほかの男性の声は `Achird`（Friendly）、`Sadachbia`（Lively）、`Fenrir`（Excitable）、`Umbriel`（Easy-going）など。全 30 種
-  - 声を聴き比べるときは `node tools/gen-tts.mjs --only call_01 --voice Achird` のように 1 件だけ作り直す
-  - `style`：話し方の指示。本文には混ぜず `speech_metadata.style` として渡します（本文はそのまま読まれるため）
-  - `model`：既定 `gemini-3.8-flash-tts`。安く速くしたいときは `gemini-3.8-flash-lite-tts`
-- API は Gemini Interactions API（`POST /v1beta/interactions`）。2026年11月時点の公式ドキュメント
-  （https://ai.google.dev/gemini-api/docs/speech-generation ）に合わせています。仕様が変わってエラーになる場合は、
-  エラー本文が表示されるので `buildRequest()` を直してください
+- 課金先のプロジェクトでは `texttospeech.googleapis.com` と `aiplatform.googleapis.com` を有効にしておく（`kinetone` は有効済み）
+- **作り直しは `--only` で 1 件ずつが基本。**声は生成のたびに少し変わるので、`--force` で全部作り直すと気に入っていた音声まで変わります
+- 声・話し方・速さの既定値は `tools/tts.config.json`（全フレーズ共通）
+  - `voice`：既定 `Puck`（男性・Upbeat）。ほかの男性の声は `Achird`（Friendly）、`Sadachbia`（Lively）、`Fenrir`（Excitable）、`Umbriel`（Easy-going）など
+  - `style`：話し方の指示（英語のほうが効く）。本文はそのまま読ませ、話し方だけを指示する文に組み込んで渡します
+  - `rate`：読む速さ（既定 0.9 ＝ 少しゆっくり）
+- 作ったあと自動で確かめ、だめなら最大 4 回まで録り直します（kinetone-aiube の検査を移植）
+  - 末尾が大きいまま終わっている（途中で切れている）
+  - 途中に 0.8 秒以上の無音がある（頼んでいない一言が足された疑い）
+  - 文字数のわりに長すぎる
 - 出力は 24kHz・モノラル・16bit の WAV
+- API キーで Gemini API から作る場合は `GEMINI_API_KEY=... node tools/gen-tts.mjs --provider gemini-api`
+  （Interactions API・`gemini-3.8-flash-tts`。2026年11月時点のドキュメントに合わせたもので、実際には試していません）
 
 ## ローカル開発
 
