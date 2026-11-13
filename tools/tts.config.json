@@ -1,0 +1,7 @@
+{
+  "model": "gemini-3.8-flash-tts",
+  "voice": "Leda",
+  "style": "明るく親しみやすい、少し幼い声で、ゆっくりはっきり",
+  "endpoint": "https://generativelanguage.googleapis.com/v1beta/interactions",
+  "delayMs": 1500
+}
