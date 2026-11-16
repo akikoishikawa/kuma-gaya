@@ -1,7 +1,7 @@
 // Service Worker：全アセットを事前にキャッシュし、以後はキャッシュから返す（cache-first）。
 // ファイル（音声・phrases.json・コード）を差し替えて配信し直すときは VERSION を上げること。
 
-const VERSION = 'v3';
+const VERSION = 'v4';
 const CACHE = `kuma-gaya-${VERSION}`;
 
 const CORE = [
@@ -12,6 +12,7 @@ const CORE = [
   './css/app.css',
   './js/app.js',
   './js/detector.js',
+  './js/face.js',
   './js/panel.js',
   './js/player.js',
   './js/settings.js',
@@ -22,6 +23,7 @@ const CORE = [
   './vendor/mediapipe/wasm/vision_wasm_internal.js',
   './vendor/mediapipe/wasm/vision_wasm_internal.wasm',
   './models/efficientdet_lite0.tflite',
+  './models/blaze_face_short_range.tflite',
 ];
 
 async function precache() {

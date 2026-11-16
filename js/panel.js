@@ -13,18 +13,21 @@ const FIELDS = [
   { key: 'cooldownSec', label: 'クールダウン', min: 0, max: 180, step: 1, fmt: (v) => `${v} 秒` },
   { key: 'volume', label: '音量', min: 0, max: 100, step: 1, fmt: (v) => `${v}%` },
   { key: 'camera', label: '使用カメラ', type: 'select', options: [['environment', '背面'], ['user', '前面']] },
+  { key: 'lookEnabled', label: 'こっちを向いたら反応（待機中はあいさつ、呼びかけ後はすぐ2段目）', type: 'checkbox' },
+  { key: 'lookSec', label: 'こっちを向いている時間', min: 0.2, max: 3, step: 0.1, fmt: (v) => `${v.toFixed(1)} 秒` },
   { key: 'debug', label: 'デバッグ表示（映像・検出枠・状態）', type: 'checkbox' },
   { key: 'speechFallback', label: '音声ファイルがないとき読み上げで代用（テスト用・本番はOFF）', type: 'checkbox' },
 ];
 
 const ADVANCED = [
   { key: 'minScore', label: '人と判定する信頼度', min: 0.2, max: 0.9, step: 0.05, fmt: (v) => v.toFixed(2) },
+  { key: 'lookTolerance', label: '正面とみなす範囲（鼻のずれ）', min: 0.1, max: 0.6, step: 0.05, fmt: (v) => `${v.toFixed(2)}（大きいほど甘い）` },
   { key: 'lostGraceMs', label: '見失いの猶予', min: 0, max: 3000, step: 100, fmt: (v) => `${v} ms` },
   { key: 'delegate', label: '検出の処理方式', type: 'select', options: [['CPU', 'CPU（推奨）'], ['GPU', 'GPU']] },
 ];
 
-const CATEGORY_LABEL = { call: '呼びかけ', followup: '2段目' };
-const REASON_LABEL = { approach: '接近', dwell: '滞在', stay: '居残り' };
+const CATEGORY_LABEL = { look: 'あいさつ', call: '呼びかけ', followup: '2段目' };
+const REASON_LABEL = { look: 'こっちを向いた', approach: '接近', dwell: '滞在', stay: '居残り', lookNext: '向いて2段目' };
 
 function el(tag, attrs = {}, ...children) {
   const e = document.createElement(tag);
@@ -188,7 +191,7 @@ export class Panel {
     const cam = s.camera ? `${s.camera.width}×${s.camera.height} ${s.camera.facingMode || ''}` : '未起動';
     this.statusEl.textContent = [
       `動作中　${s.started ? 'はい' : 'いいえ（スタート前）'}`,
-      `検出　　${s.delegate || '-'}　${s.detectMs.toFixed(0)} ms／回　${s.fps.toFixed(1)} fps`,
+      `検出　　${s.delegate || '-'}　人 ${s.detectMs.toFixed(0)} ms／顔 ${s.faceMs.toFixed(0)} ms　${s.fps.toFixed(1)} fps`,
       `カメラ　${cam}`,
       `音声　　${s.audio}　　画面ロック防止 ${s.wakeState}`,
     ].join('\n');
@@ -233,6 +236,7 @@ export class Panel {
     const core = {
       アプリ: 'js/app.js',
       検出モデル: 'models/efficientdet_lite0.tflite',
+      顔検出モデル: 'models/blaze_face_short_range.tflite',
       'MediaPipe WASM': 'vendor/mediapipe/wasm/vision_wasm_internal.wasm',
     };
     const lines = [];

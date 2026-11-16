@@ -13,6 +13,9 @@ export const DEFAULTS = Object.freeze({
   camera: 'environment',  // 'environment' = 背面 / 'user' = 前面
   debug: false,           // デバッグ表示（OFF時は画面真っ黒）
   speechFallback: true,   // 音声ファイルがないとき Web Speech API で読み上げる（テスト用）
+  lookEnabled: true,      // こっちを向いたら反応する（待機中はあいさつ、呼びかけ後はすぐ2段目）
+  lookSec: 0.5,           // 何秒こっちを向いていたら反応するか
+  lookTolerance: 0.25,    // 正面とみなす範囲（鼻先のずれ÷両目の間隔）。大きいほど甘い
   // 詳細
   minScore: 0.5,          // 人と判定する信頼度の下限
   lostGraceMs: 800,       // 一瞬見失っても「いる」とみなす猶予

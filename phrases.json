@@ -1,4 +1,6 @@
 [
+  { "id": "look_01", "category": "look", "file": "look_01.wav", "text": "こんにちは！" },
+  { "id": "look_02", "category": "look", "file": "look_02.wav", "text": "やあ、こんにちは！" },
   { "id": "call_01", "category": "call", "file": "call_01.wav", "text": "こんにちは！ちょっとだけ寄っていってよ" },
   { "id": "call_02", "category": "call", "file": "call_02.wav", "text": "ねえねえ、きみの町にもクマ出てるかも。調べてみる？" },
   { "id": "call_03", "category": "call", "file": "call_03.wav", "text": "熊出没マップ、くまウォッチだよ。見てみてね" },

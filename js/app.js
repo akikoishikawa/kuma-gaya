@@ -1,6 +1,7 @@
 import { Settings, Stats } from './settings.js';
 import { Player } from './player.js';
 import { Detector } from './detector.js';
+import { FaceWatcher } from './face.js';
 import { Trigger } from './trigger.js';
 import { Panel } from './panel.js';
 
@@ -17,6 +18,7 @@ const settings = new Settings();
 const stats = new Stats();
 const player = new Player(settings);
 const detector = new Detector();
+const faceWatcher = new FaceWatcher();
 const trigger = new Trigger({ settings, player, stats });
 
 let stream = null;
@@ -42,6 +44,7 @@ const panel = new Panel({
     started,
     delegate: detector.delegate,
     detectMs: detector.lastMs,
+    faceMs: faceWatcher.lastMs,
     fps,
     wakeState,
     audio: player.contextState,
@@ -72,6 +75,7 @@ startBtn.addEventListener('click', async () => {
     await Promise.all([
       startCamera(),
       detector.init({ delegate: settings.values.delegate, minScore: settings.values.minScore }),
+      initFaces(),
       player.decodeAll(),
     ]);
   } catch (e) {
@@ -86,6 +90,15 @@ startBtn.addEventListener('click', async () => {
   applyDebug();
   loop();
 });
+
+// 顔検出は「こっちを向いた」反応のためだけに使う。初期化に失敗しても本体は止めない
+async function initFaces() {
+  try {
+    await faceWatcher.init({ delegate: settings.values.delegate });
+  } catch (e) {
+    console.warn('顔検出を初期化できませんでした（こっちを向いた反応は無効）', e);
+  }
+}
 
 function explainError(e) {
   if (e?.name === 'NotAllowedError') return 'カメラが許可されていません。設定 > Safari > カメラ を「許可」にしてから再度スタートしてください。';
@@ -160,18 +173,23 @@ function loop() {
   const t0 = performance.now();
   if (!document.hidden && video.readyState >= 2 && video.videoWidth > 0) {
     let boxes = [];
+    let faces = null;
     try {
       boxes = detector.detect(video);
+      // 人がいて、向きを見る意味がある状態のときだけ顔を調べる
+      if (boxes.length > 0 && trigger.wantsFaces && faceWatcher.ready) {
+        faces = faceWatcher.detect(video, boxes, settings.values.lookTolerance);
+      }
     } catch (e) {
       console.error(e);
     }
-    trigger.update(t0, boxes, video.videoWidth, video.videoHeight);
+    trigger.update(t0, boxes, video.videoWidth, video.videoHeight, faces);
     if (lastTick) {
       const inst = 1000 / (t0 - lastTick);
       fps = fps ? fps * 0.8 + inst * 0.2 : inst;
     }
     lastTick = t0;
-    if (settings.values.debug) render(boxes, t0);
+    if (settings.values.debug) render(boxes, faces, t0);
   }
   const wait = settings.values.intervalMs - (performance.now() - t0);
   timer = setTimeout(loop, Math.max(10, wait));
@@ -187,7 +205,7 @@ function applyDebug() {
   if (!on) ctx2d.clearRect(0, 0, canvas.width, canvas.height);
 }
 
-function render(boxes, now) {
+function render(boxes, faces, now) {
   const vw = video.videoWidth;
   const vh = video.videoHeight;
   if (canvas.width !== vw || canvas.height !== vh) {
@@ -214,13 +232,25 @@ function render(boxes, now) {
       ctx2d.fillText(label, b.originX, b.originY - 6);
     }
   }
+  // 顔：正面なら黄、横向きなら灰。目と鼻に点
+  for (const f of faces || []) {
+    ctx2d.strokeStyle = f.facing ? '#ffd23c' : '#888';
+    ctx2d.strokeRect(f.box.originX, f.box.originY, f.box.width, f.box.height);
+    ctx2d.fillStyle = ctx2d.strokeStyle;
+    for (const k of f.keypoints.slice(0, 3)) {
+      ctx2d.beginPath();
+      ctx2d.arc(k.x, k.y, ctx2d.lineWidth * 1.5, 0, Math.PI * 2);
+      ctx2d.fill();
+    }
+  }
   const d = trigger.describe(now);
   const s = settings.values;
   statusEl.textContent = [
     `状態　${d.label}`,
     `人　　${d.count} 人　最大 ${Math.round(d.ratio * 100)}%（接近 ${s.approachPct}%）`,
     `滞在　${d.stay.toFixed(1)} / ${s.dwellSec} 秒`,
-    `検出　${detector.lastMs.toFixed(0)} ms　${fps.toFixed(1)} fps（${detector.delegate}）`,
+    `顔　　${s.lookEnabled ? `${faces ? `${d.faces} 個` : '調べていない'}　正面 ${d.look.toFixed(1)} / ${s.lookSec} 秒${faces && faces[0] ? `（ずれ ${faces[0].offset.toFixed(2)}／許容 ${s.lookTolerance}）` : ''}` : 'OFF'}`,
+    `検出　人 ${detector.lastMs.toFixed(0)} ms　顔 ${faces ? faceWatcher.lastMs.toFixed(0) : '-'} ms　${fps.toFixed(1)} fps（${detector.delegate}）`,
     `映像　${vw}×${vh}　音声 ${player.contextState}　画面ロック防止 ${wakeState}`,
   ].join('\n');
 }
@@ -232,7 +262,10 @@ settings.addEventListener('change', async (e) => {
   if (!started) return;
   try {
     if (key === 'camera') await startCamera();
-    if (key === 'delegate') await detector.init({ delegate: value, minScore: settings.values.minScore });
+    if (key === 'delegate') {
+      await detector.init({ delegate: value, minScore: settings.values.minScore });
+      await initFaces();
+    }
     if (key === 'minScore') await detector.setMinScore(value);
     showError('');
   } catch (err) {
