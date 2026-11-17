@@ -7,7 +7,8 @@ const TAP_WINDOW_MS = 1200;
 
 const FIELDS = [
   { key: 'intervalMs', label: '検出間隔', min: 100, max: 2000, step: 50, fmt: (v) => `${v} ms（約 ${(1000 / v).toFixed(1)} fps）` },
-  { key: 'approachPct', label: '接近しきい値（人の枠の面積）', min: 5, max: 90, step: 1, fmt: (v) => `画面の ${v}%` },
+  { key: 'nearPct', label: '反応する範囲（これより小さく写る遠い人は無視）', min: 1, max: 90, step: 1, fmt: (v) => `人の枠が画面の ${v}% 以上` },
+  { key: 'approachPct', label: '接近しきい値（超えたら滞在を待たずに呼びかけ）', min: 5, max: 100, step: 1, fmt: (v) => `画面の ${v}%` },
   { key: 'dwellSec', label: '滞在時間', min: 0.5, max: 10, step: 0.1, fmt: (v) => `${v.toFixed(1)} 秒` },
   { key: 'followupSec', label: '2段目までの待ち時間', min: 0, max: 30, step: 0.5, fmt: (v) => (v === 0 ? '2段目なし' : `${v} 秒`) },
   { key: 'cooldownSec', label: 'クールダウン', min: 0, max: 180, step: 1, fmt: (v) => `${v} 秒` },
@@ -25,6 +26,10 @@ const ADVANCED = [
   { key: 'lostGraceMs', label: '見失いの猶予', min: 0, max: 3000, step: 100, fmt: (v) => `${v} ms` },
   { key: 'delegate', label: '検出の処理方式', type: 'select', options: [['CPU', 'CPU（推奨）'], ['GPU', 'GPU']] },
 ];
+
+const CALIB_WAIT_SEC = 5;    // ボタンを押してから測り始めるまで（立ち位置に移動する時間）
+const CALIB_MEASURE_SEC = 3; // 測る時間
+const CALIB_MARGIN = 0.9;    // 測った大きさより少しだけ小さめを境目にする（その位置の人を確実に含める）
 
 const CATEGORY_LABEL = { look: 'あいさつ', call: '呼びかけ', followup: '2段目' };
 const REASON_LABEL = { look: 'こっちを向いた', approach: '接近', dwell: '滞在', stay: '居残り', lookNext: '向いて2段目' };
@@ -137,6 +142,9 @@ export class Panel {
         el('button', { type: 'button', class: 'close', onclick: () => this.close() }, '閉じる')),
       this.flashEl,
       el('section', {}, el('h3', {}, '動作'), ...FIELDS.map((f) => this.field(f))),
+      el('section', {}, el('h3', {}, '反応する範囲を合わせる'),
+        el('p', { class: 'note' }, `ボタンを押したら、ぬいぐるみから反応させたい距離（例：1m）に立ってください。${CALIB_WAIT_SEC} 秒後に「ピッ」と鳴ってから ${CALIB_MEASURE_SEC} 秒測り、「ピピッ」で終わりです。そのときの大きさを境目にします。測る間はほかの人が近くに写らないようにしてください。`),
+        el('div', { class: 'buttons' }, el('button', { type: 'button', onclick: (ev) => this.calibrate(ev.currentTarget) }, 'いまの立ち位置を境目にする'))),
       el('details', {}, el('summary', {}, '詳細設定'), ...ADVANCED.map((f) => this.field(f))),
       el('section', {}, el('h3', {}, '動作確認'), el('div', { class: 'buttons' }, ...testBtns), this.statusEl),
       el('section', {}, el('h3', {}, '再生回数'), this.statsEl,
@@ -175,11 +183,63 @@ export class Panel {
             }
           },
         }, '設定を初期値に戻す'))),
-      el('p', { class: 'note' }, `初期値：検出 ${DEFAULTS.intervalMs}ms／接近 ${DEFAULTS.approachPct}%／滞在 ${DEFAULTS.dwellSec}秒／2段目 ${DEFAULTS.followupSec}秒／クールダウン ${DEFAULTS.cooldownSec}秒`),
+      el('p', { class: 'note' }, `初期値：検出 ${DEFAULTS.intervalMs}ms／範囲 ${DEFAULTS.nearPct}%／接近 ${DEFAULTS.approachPct}%／滞在 ${DEFAULTS.dwellSec}秒／2段目 ${DEFAULTS.followupSec}秒／クールダウン ${DEFAULTS.cooldownSec}秒`),
     );
     this.renderStats();
     this.renderPhrases();
     this.checkOffline();
+  }
+
+  // 立ってもらった位置での人の大きさを測り、「反応する範囲」にする
+  async calibrate(btn) {
+    if (!this.getStatus().started) {
+      this.flash('先にスタートしてから（カメラが動いている状態で）測ってください');
+      return;
+    }
+    btn.disabled = true;
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    for (let i = CALIB_WAIT_SEC; i > 0; i--) {
+      this.flash(`${i} 秒後に測ります。立ち位置へどうぞ`);
+      await sleep(1000);
+    }
+    this.beep(1);
+    const samples = [];
+    const end = performance.now() + CALIB_MEASURE_SEC * 1000;
+    while (performance.now() < end) {
+      this.flash(`測っています…（${((end - performance.now()) / 1000).toFixed(0)} 秒）`);
+      const n = this.getStatus().nearest;
+      if (n > 0) samples.push(n);
+      await sleep(150);
+    }
+    this.beep(2);
+    btn.disabled = false;
+    if (samples.length < 3) {
+      this.flash('人が写っていませんでした。カメラの向きを確かめて、もう一度やってください');
+      return;
+    }
+    samples.sort((a, b) => a - b);
+    const median = samples[Math.floor(samples.length / 2)];
+    const pct = Math.max(1, Math.min(90, Math.round(median * 100 * CALIB_MARGIN)));
+    this.settings.set('nearPct', pct);
+    this.build();
+    const s = this.settings.values;
+    this.flash(`測った大きさ ${Math.round(median * 100)}% → 反応する範囲を ${pct}% にしました。${s.approachPct <= pct ? '（接近しきい値がこれ以下なので、範囲に入るとすぐ呼びかけます）' : ''}`);
+  }
+
+  beep(times) {
+    const ctx = this.player.ctx;
+    if (!ctx) return;
+    for (let i = 0; i < times; i++) {
+      const t = ctx.currentTime + i * 0.18;
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.frequency.value = 1200;
+      g.gain.setValueAtTime(0.25, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+      osc.connect(g).connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.13);
+    }
   }
 
   flash(text) {

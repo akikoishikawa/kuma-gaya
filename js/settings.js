@@ -5,7 +5,9 @@ const STATS_KEY = 'kuma-gaya:stats:v1';
 
 export const DEFAULTS = Object.freeze({
   intervalMs: 250,        // 検出間隔（250ms = 約4fps）
-  approachPct: 25,        // 接近しきい値：人の枠の面積が画面の何%を超えたら呼びかけるか
+  nearPct: 35,            // 反応する範囲：人の枠の面積が画面のこの%未満の人（遠い人）はいないものとみなす
+                          //   iPhone XR 背面カメラ・縦向きで、約1m ≈ 40〜50%、1.5m ≈ 30%、2m ≈ 17%、3m ≈ 8%（目安）
+  approachPct: 50,        // 接近しきい値：これを超えたら滞在を待たずにすぐ呼びかける
   dwellSec: 1.5,          // 滞在：何秒連続で検出されたら呼びかけるか
   followupSec: 6,         // 呼びかけ後、何秒残っていたら2段目を流すか（0で2段目なし）
   cooldownSec: 25,        // 話し終えてから次の呼びかけまでの休み
@@ -43,6 +45,8 @@ export class Settings extends EventTarget {
   constructor() {
     super();
     const stored = load(SETTINGS_KEY) || {};
+    // 「反応する範囲」を足す前の保存値：接近しきい値が旧初期値 25% のままなら新しい初期値にする
+    if (!('nearPct' in stored) && stored.approachPct === 25) delete stored.approachPct;
     this.values = { ...DEFAULTS };
     for (const k of Object.keys(DEFAULTS)) {
       if (k in stored && typeof stored[k] === typeof DEFAULTS[k]) this.values[k] = stored[k];

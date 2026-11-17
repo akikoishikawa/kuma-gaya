@@ -28,6 +28,7 @@ let wakeLock = null;
 let wakeState = '未取得';
 let lastTick = 0;
 let fps = 0;
+let nearest = 0; // 直近フレームで一番大きい人の枠の面積比（遠い人も含む。範囲の合わせ込み用）
 
 // ---- Service Worker（オフライン用）。?nosw を付けると登録しない（開発用）
 let swRegistration = null;
@@ -45,6 +46,7 @@ const panel = new Panel({
     delegate: detector.delegate,
     detectMs: detector.lastMs,
     faceMs: faceWatcher.lastMs,
+    nearest,
     fps,
     wakeState,
     audio: player.contextState,
@@ -173,23 +175,30 @@ function loop() {
   const t0 = performance.now();
   if (!document.hidden && video.readyState >= 2 && video.videoWidth > 0) {
     let boxes = [];
+    let near = [];
     let faces = null;
+    const area = video.videoWidth * video.videoHeight;
     try {
       boxes = detector.detect(video);
-      // 人がいて、向きを見る意味がある状態のときだけ顔を調べる
-      if (boxes.length > 0 && trigger.wantsFaces && faceWatcher.ready) {
-        faces = faceWatcher.detect(video, boxes, settings.values.lookTolerance);
+      // 小さく写っている人（遠い人＝通路の向こう側など）はいないものとみなす
+      const minRatio = settings.values.nearPct / 100;
+      for (const b of boxes) b.ratio = Math.min(1, (b.width * b.height) / area);
+      near = boxes.filter((b) => b.ratio >= minRatio);
+      // 近くに人がいて、向きを見る意味がある状態のときだけ顔を調べる
+      if (near.length > 0 && trigger.wantsFaces && faceWatcher.ready) {
+        faces = faceWatcher.detect(video, near, settings.values.lookTolerance);
       }
     } catch (e) {
       console.error(e);
     }
-    trigger.update(t0, boxes, video.videoWidth, video.videoHeight, faces);
+    nearest = boxes.reduce((m, b) => Math.max(m, b.ratio || 0), 0);
+    trigger.update(t0, near, video.videoWidth, video.videoHeight, faces);
     if (lastTick) {
       const inst = 1000 / (t0 - lastTick);
       fps = fps ? fps * 0.8 + inst * 0.2 : inst;
     }
     lastTick = t0;
-    if (settings.values.debug) render(boxes, faces, t0);
+    if (settings.values.debug) render(boxes, near.length, faces, t0);
   }
   const wait = settings.values.intervalMs - (performance.now() - t0);
   timer = setTimeout(loop, Math.max(10, wait));
@@ -205,7 +214,7 @@ function applyDebug() {
   if (!on) ctx2d.clearRect(0, 0, canvas.width, canvas.height);
 }
 
-function render(boxes, faces, now) {
+function render(boxes, nearCount, faces, now) {
   const vw = video.videoWidth;
   const vh = video.videoHeight;
   if (canvas.width !== vw || canvas.height !== vh) {
@@ -214,13 +223,18 @@ function render(boxes, faces, now) {
   }
   ctx2d.clearRect(0, 0, vw, vh);
   const threshold = settings.values.approachPct / 100;
+  const nearMin = settings.values.nearPct / 100;
   ctx2d.lineWidth = Math.max(2, vw / 200);
   ctx2d.font = `${Math.round(vh / 22)}px sans-serif`;
+  // 枠の色：遠い（無視）＝灰の点線、範囲内＝水色、接近＝赤
   for (const b of boxes) {
-    const r = (b.width * b.height) / (vw * vh);
-    ctx2d.strokeStyle = r >= threshold ? '#ff5a3c' : '#3cd2ff';
+    const r = b.ratio ?? (b.width * b.height) / (vw * vh);
+    const far = r < nearMin;
+    ctx2d.strokeStyle = far ? '#777' : r >= threshold ? '#ff5a3c' : '#3cd2ff';
+    ctx2d.setLineDash(far ? [ctx2d.lineWidth * 3, ctx2d.lineWidth * 3] : []);
     ctx2d.strokeRect(b.originX, b.originY, b.width, b.height);
-    const label = `${Math.round(r * 100)}% / ${Math.round(b.score * 100)}`;
+    ctx2d.setLineDash([]);
+    const label = `${Math.round(r * 100)}%${far ? ' 遠い' : ''} / ${Math.round(b.score * 100)}`;
     ctx2d.fillStyle = ctx2d.strokeStyle;
     // 前面カメラは canvas ごと左右反転しているので文字も反転して書く
     if (video.classList.contains('mirror')) {
@@ -247,7 +261,7 @@ function render(boxes, faces, now) {
   const s = settings.values;
   statusEl.textContent = [
     `状態　${d.label}`,
-    `人　　${d.count} 人　最大 ${Math.round(d.ratio * 100)}%（接近 ${s.approachPct}%）`,
+    `人　　範囲内 ${nearCount} 人／遠い ${boxes.length - nearCount} 人　最大 ${Math.round(nearest * 100)}%（範囲 ${s.nearPct}%〜・接近 ${s.approachPct}%）`,
     `滞在　${d.stay.toFixed(1)} / ${s.dwellSec} 秒`,
     `顔　　${s.lookEnabled ? `${faces ? `${d.faces} 個` : '調べていない'}　正面 ${d.look.toFixed(1)} / ${s.lookSec} 秒${faces && faces[0] ? `（ずれ ${faces[0].offset.toFixed(2)}／許容 ${s.lookTolerance}）` : ''}` : 'OFF'}`,
     `検出　人 ${detector.lastMs.toFixed(0)} ms　顔 ${faces ? faceWatcher.lastMs.toFixed(0) : '-'} ms　${fps.toFixed(1)} fps（${detector.delegate}）`,
