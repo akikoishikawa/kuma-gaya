@@ -114,9 +114,11 @@ export class Trigger {
       console.error(e);
     }
     if (ok) this.stats.record(category, this.player.lastPlayedId, reason);
+    const how = this.player.lastSource === 'speech' ? '・読み上げで代用' : '';
     this.note(ok
-      ? `${CATEGORY_TEXT[category] || category}を再生した：${this.player.lastPlayedId}（${REASON_TEXT[reason] || reason}）`
+      ? `${CATEGORY_TEXT[category] || category}を再生した：${this.player.lastPlayedId}（${REASON_TEXT[reason] || reason}${how}）`
       : `${CATEGORY_TEXT[category] || category}を再生できなかった（${REASON_TEXT[reason] || reason}）`);
+    if (ok && this.player.lastProblem) this.note(`⚠ ${this.player.lastProblem}`);
     const now = performance.now();
     const s = this.settings.values;
     if (ok && category === 'call' && s.followupSec > 0 && this.player.hasCategory('followup')) {

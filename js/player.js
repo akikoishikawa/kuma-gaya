@@ -22,8 +22,11 @@ export class Player {
     this.playing = false;
     this.current = null;
     this.lastPlayedId = null;
+    this.lastSource = null;     // 直前の再生が 'file'（音声ファイル）か 'speech'（読み上げ）か
+    this.lastProblem = '';      // 直前の再生で音が出なかったと分かる理由（なければ空）
     this.ctx = null;
     this.gain = null;
+    this.onStateChange = null;  // 音の状態（running / suspended / interrupted / closed）が変わったとき
   }
 
   async loadPhrases() {
@@ -58,6 +61,8 @@ export class Player {
       this.ctx = new AC();
       this.gain = this.ctx.createGain();
       this.gain.connect(this.ctx.destination);
+      const ctx = this.ctx;
+      ctx.addEventListener('statechange', () => this.onStateChange?.(ctx.state));
     }
     this.ctx.resume();
     const silent = this.ctx.createBuffer(1, 1, 22050);
@@ -97,6 +102,19 @@ export class Player {
 
   resume() {
     if (this.ctx && this.ctx.state !== 'running') this.ctx.resume().catch(() => {});
+  }
+
+  // 画面のタップ（ユーザー操作の中）で呼ぶ。止まった音を戻す。壊れていたら作り直す
+  wake() {
+    if (!this.ctx) return;
+    if (this.ctx.state === 'closed') {
+      this.ctx = null;
+      this.unlock();
+      this.buffers.clear();
+      this.decodeAll();
+      return;
+    }
+    if (this.ctx.state !== 'running') this.unlock();
   }
 
   get contextState() {
@@ -142,6 +160,8 @@ export class Player {
     const source = this.sourceOf(p);
     this.playing = true;
     this.current = { ...p, source };
+    this.lastSource = source;
+    this.lastProblem = '';
     try {
       if (source === 'file') await this.playBuffer(this.buffers.get(p.id));
       else await this.speak(p.tts || p.text);
@@ -155,7 +175,12 @@ export class Player {
 
   async playBuffer(buffer) {
     if (this.ctx.state !== 'running') {
-      try { await this.ctx.resume(); } catch { /* 下のタイムアウトで抜ける */ }
+      // iPhone では画面ロック・電話・他のアプリの音などのあと止まったままになることがある。
+      // タップなしでは戻らないことが多いので、戻らなければ理由を残す（画面をタップすると戻す：app.js）
+      try {
+        await Promise.race([this.ctx.resume(), new Promise((r) => setTimeout(r, 1000))]);
+      } catch { /* 下で理由を残す */ }
+      if (this.ctx.state !== 'running') this.lastProblem = `音が止まっている（${this.ctx.state}）。画面をタップすると戻ります`;
     }
     this.gain.gain.value = this.settings.values.volume / 100;
     await new Promise((resolve) => {

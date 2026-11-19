@@ -172,6 +172,14 @@ async function requestWakeLock() {
   }
 }
 
+const AUDIO_STATE = { running: '鳴らせる', suspended: '止まっている', interrupted: '割り込みで止まっている', closed: '壊れている' };
+player.onStateChange = (st) => trigger.note(`音の状態：${AUDIO_STATE[st] || st}（${st}）`);
+
+// 画面のどこかをタップしたら、止まっている音を戻す（iPhone はタップの中でしか戻せないことが多い）
+document.addEventListener('pointerdown', () => {
+  if (started) player.wake();
+}, true);
+
 document.addEventListener('visibilitychange', async () => {
   if (document.visibilityState !== 'visible' || !started) return;
   await requestWakeLock();
