@@ -183,6 +183,7 @@ html, body {
   font: 12px/1.6 ui-monospace, Menlo, monospace;
   white-space: pre-wrap;
 }
+#panel pre.log { max-height: 16em; overflow-y: auto; -webkit-user-select: text; user-select: text; }
 #panel table { border-collapse: collapse; }
 #panel th, #panel td { padding: 4px 16px 4px 0; text-align: left; font-variant-numeric: tabular-nums; }
 #panel .note { margin: 6px 0; font-size: 12px; color: #a1a1a6; line-height: 1.6; white-space: pre-line; }

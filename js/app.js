@@ -50,6 +50,7 @@ const panel = new Panel({
     delegate: detector.delegate,
     detectMs: detector.lastMs,
     faceMs: faceWatcher.lastMs,
+    log: trigger.log,
     nearest,
     fps,
     wakeState,
@@ -197,8 +198,9 @@ function loop() {
     const area = video.videoWidth * video.videoHeight;
     try {
       boxes = detector.detect(video);
-      // 小さく写っている人（遠い人＝通路の向こう側など）はいないものとみなす
-      const minRatio = settings.values.nearPct / 100;
+      // 小さく写っている人（遠い人＝通路の向こう側など）はいないものとみなす。
+      // ただし一度範囲に入った人は、話しかけられて少し下がっても「いる」まま扱う（境目で出たり入ったりしないように）
+      const minRatio = nearThreshold();
       for (const b of boxes) b.ratio = Math.min(1, (b.width * b.height) / area);
       near = boxes.filter((b) => b.ratio >= minRatio);
       // 範囲内に人がいるときだけ顔を調べる（発熱対策）。画面の顔の点もそのときだけ出る
@@ -234,6 +236,13 @@ function applyDebug() {
   const on = settings.values.debug;
   document.body.classList.toggle('debug', on);
   statusEl.hidden = !on || !started;
+}
+
+// 反応する範囲の境目（面積比）。誰かがいる間は境目を下げて、少し下がった人も含める
+const NEAR_KEEP = 0.6;
+function nearThreshold() {
+  const base = settings.values.nearPct / 100;
+  return trigger.presentSince !== null ? base * NEAR_KEEP : base;
 }
 
 // ---- セリフの吹き出し：再生中のフレーズの文字を出す
@@ -313,7 +322,7 @@ function render(boxes, nearCount, faces, shownFaces, now) {
   }
   ctx2d.clearRect(0, 0, vw, vh);
   const threshold = settings.values.approachPct / 100;
-  const nearMin = settings.values.nearPct / 100;
+  const nearMin = nearThreshold();
   const unit = Math.max(vw, vh) / 640; // 映像の大きさに合わせて線と文字の太さを決める
   ctx2d.lineWidth = 8 * unit;
   ctx2d.font = `bold ${Math.round(18 * unit)}px sans-serif`;

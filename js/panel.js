@@ -131,6 +131,7 @@ export class Panel {
     }, `${label}をテスト再生`));
 
     this.statusEl = el('pre', { class: 'status' });
+    this.logEl = el('pre', { class: 'status log' });
     this.offlineEl = el('div', { class: 'offline' }, '確認中…');
     this.phrasesEl = el('div');
     this.statsEl = el('div');
@@ -153,6 +154,9 @@ export class Panel {
         el('div', { class: 'buttons' }, el('button', { type: 'button', onclick: (ev) => this.calibrate(ev.currentTarget) }, 'いまの立ち位置を境目にする'))),
       el('details', {}, el('summary', {}, '詳細設定'), ...ADVANCED.map((f) => this.field(f))),
       el('section', {}, el('h3', {}, '動作確認'), el('div', { class: 'buttons' }, ...testBtns), this.statusEl),
+      el('section', {}, el('h3', {}, '最近の動き（新しい順）'),
+        el('p', { class: 'note' }, '話しかけなかった・2回目が出なかったときは、ここで理由を確かめられます。アプリを開き直すと消えます。'),
+        this.logEl),
       el('section', {}, el('h3', {}, '再生回数'), this.statsEl,
         el('div', { class: 'buttons' }, el('button', {
           type: 'button',
@@ -261,6 +265,10 @@ export class Panel {
       `カメラ　${cam}`,
       `音声　　${s.audio}　　画面ロック防止 ${s.wakeState}`,
     ].join('\n');
+    const t = (d) => d.toLocaleTimeString('ja-JP', { hour12: false });
+    this.logEl.textContent = s.log.length
+      ? [...s.log].reverse().map((e) => `${t(e.at)}  ${e.text}`).join('\n')
+      : 'まだ何もありません';
   }
 
   renderStats() {
