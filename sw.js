@@ -1,7 +1,7 @@
 // Service Worker：全アセットを事前にキャッシュし、以後はキャッシュから返す（cache-first）。
 // ファイル（音声・phrases.json・コード）を差し替えて配信し直すときは VERSION を上げること。
 
-const VERSION = 'v15';
+const VERSION = 'v16';
 const CACHE = `kuma-gaya-${VERSION}`;
 
 const CORE = [

@@ -18,7 +18,7 @@ export const DEFAULTS = Object.freeze({
   camera: 'user',         // 'user' = 前面（インカメラ） / 'environment' = 背面
   debug: false,           // デバッグ表示（状態・検出時間などの文字）
   speechFallback: true,   // 音声ファイルがないとき Web Speech API で読み上げる（テスト用）
-  lookEnabled: true,      // こっちを向いたら反応する（待機中はあいさつ、呼びかけ後はすぐ2段目）
+  lookEnabled: true,      // こっちを向いたら反応する（待機中はすぐ呼びかけ、呼びかけ後はすぐ2段目）
   lookSec: 0.5,           // 何秒こっちを向いていたら反応するか
   lookTolerance: 0.25,    // 正面とみなす範囲（鼻先のずれ÷両目の間隔）。大きいほど甘い
   // 詳細

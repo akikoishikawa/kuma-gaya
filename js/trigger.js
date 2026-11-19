@@ -1,11 +1,12 @@
 // 呼びかけの状態機械
 //
-//   待機 ─(こっちを向いた)──▶ 再生中[あいさつ] ─┐
-//   待機 ─(接近 or 滞在)───▶ 再生中[呼びかけ] ─┴▶ 2段目待ち ─(残っている or こっちを向いた)─▶ 再生中[2段目] ─▶ クールダウン ─▶ 待機
-//                                                     └──(いなくなった)──────────────────────────────────────▶ クールダウン
+//   待機 ─(こっちを向いた or 接近 or 滞在)─▶ 再生中[呼びかけ] ─▶ 2段目待ち ─(残っている or こっちを向いた)─▶ 再生中[2段目] ─▶ クールダウン ─▶ 待機
+//                                                                └──(いなくなった)──────────────────────────────────────▶ クールダウン
 //
-// 「こっちを向いた」ことは口に出さない（気味が悪いので）。待機中ならふつうのあいさつ、
-// 2段目待ちなら待ち時間を待たずに2段目の案内へ進むだけ。
+// 「こっちを向いた」ことは口に出さない（気味が悪いので）。待機中なら呼びかけを早めるだけ
+// （呼びかけには「こんにちは！」のようなあいさつも混ざっている）、2段目待ちなら待ち時間を待たずに2段目へ進むだけ。
+// 画面に自分が映るので近づいた人はほぼ画面を見る。向いたら別のあいさつを流す作りだと、
+// 呼びかけがほとんど流れなくなったため、向いたときも呼びかけにしている。
 // クールダウンは「話し終えた時点」から数える。
 
 export const STATE_LABEL = {
@@ -21,7 +22,7 @@ const LOOK_GRACE_MS = 400; // 顔の向きが一瞬外れても「向いてい�
 const FOLLOW_GRACE_MS = 2000;
 const LOG_MAX = 40;
 const REASON_TEXT = { look: 'こっちを向いた', approach: '接近', dwell: '滞在', stay: '居残り', lookNext: '向いて2段目' };
-const CATEGORY_TEXT = { look: 'あいさつ', call: '呼びかけ', followup: '2段目' };
+const CATEGORY_TEXT = { call: '呼びかけ', followup: '2段目' };
 
 export class Trigger {
   constructor({ settings, player, stats }) {
@@ -81,7 +82,7 @@ export class Trigger {
     switch (this.state) {
       case 'idle':
         if (!present) break;
-        if (looked && this.player.hasCategory('look')) this.speak('look', 'look');
+        if (looked) this.speak('call', 'look');
         else if (this.ratio >= s.approachPct / 100) this.speak('call', 'approach');
         else if (now - this.presentSince >= s.dwellSec * 1000) this.speak('call', 'dwell');
         break;
@@ -118,8 +119,7 @@ export class Trigger {
       : `${CATEGORY_TEXT[category] || category}を再生できなかった（${REASON_TEXT[reason] || reason}）`);
     const now = performance.now();
     const s = this.settings.values;
-    const opener = category === 'call' || category === 'look';
-    if (ok && opener && s.followupSec > 0 && this.player.hasCategory('followup')) {
+    if (ok && category === 'call' && s.followupSec > 0 && this.player.hasCategory('followup')) {
       this.state = 'waitFollowup';
       this.followFrom = now;
       // 話している間ずっと向いていた分は数えない。ここから改めて向いていたら2段目へ
