@@ -29,7 +29,8 @@ js/settings.js         設定と再生回数（localStorage）
 js/panel.js            隠し設定パネル
 vendor/mediapipe/      @mediapipe/tasks-vision 1.2.0（Apache-2.0）の bundle と WASM（SIMD 版）
 models/                efficientdet_lite0.tflite（int8）、blaze_face_short_range.tflite
-icons/                 アプリアイコン
+icons/                 アプリアイコン（ツキノワグマ）。icon.svg が元絵で、PNG は次のように書き出す
+                       qlmanage -t -s 512 -o /tmp icons/icon.svg → sips で JPEG を経由して透明をなくし icon-512.png、sips -z 180 180 で icon-180.png
 tools/serve.mjs        開発用サーバー（HTTP / HTTPS、依存なし）
 tools/gen-tts.mjs      Gemini TTS で音声を一括生成（依存なし）
 tools/tts.config.json  TTS の声・話し方・モデル
