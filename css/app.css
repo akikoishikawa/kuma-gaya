@@ -183,6 +183,13 @@ html, body {
   font: 12px/1.6 ui-monospace, Menlo, monospace;
   white-space: pre-wrap;
 }
+#panel ul.legend { margin: 8px 0; padding: 0; list-style: none; font-size: 14px; line-height: 1.6; }
+#panel ul.legend li { display: flex; align-items: baseline; gap: 8px; padding: 4px 0; }
+#panel ul.legend b { white-space: nowrap; }
+#panel .swatch { flex: none; width: 28px; height: 16px; border-radius: 3px; border: 4px solid; align-self: center; }
+#panel .swatch.far { border-color: #777; border-style: dashed; }
+#panel .swatch.near { border-color: #3cd2ff; }
+#panel .swatch.close { border-color: #ff5a3c; }
 #panel pre.log { max-height: 16em; overflow-y: auto; -webkit-user-select: text; user-select: text; }
 #panel table { border-collapse: collapse; }
 #panel th, #panel td { padding: 4px 16px 4px 0; text-align: left; font-variant-numeric: tabular-nums; }

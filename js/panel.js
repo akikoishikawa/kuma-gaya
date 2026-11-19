@@ -54,6 +54,8 @@ export class Panel {
     this.statusTimer = 0;
     document.addEventListener('pointerdown', (e) => this.handleTap(e), true);
     stats.addEventListener('change', () => this.isOpen && this.renderStats());
+    // 枠の色の説明には設定の数字が入るので、設定が変わったら書き直す
+    settings.addEventListener('change', () => this.isOpen && this.legendBox?.replaceChildren(this.legend()));
   }
 
   get isOpen() {
@@ -131,6 +133,7 @@ export class Panel {
     }, `${label}をテスト再生`));
 
     this.statusEl = el('pre', { class: 'status' });
+    this.legendBox = el('div', {}, this.legend());
     this.logEl = el('pre', { class: 'status log' });
     this.offlineEl = el('div', { class: 'offline' }, '確認中…');
     this.phrasesEl = el('div');
@@ -142,6 +145,7 @@ export class Panel {
         el('h2', {}, 'くまガヤ 設定'),
         el('button', { type: 'button', class: 'close', onclick: () => this.close() }, '閉じる')),
       this.flashEl,
+      el('section', {}, el('h3', {}, '画面の枠の色'), this.legendBox),
       el('section', {}, el('h3', {}, '動作'), ...FIELDS.map((f) => this.field(f))),
       el('section', {}, el('h3', {}, '反応する範囲を合わせる'),
         el('p', { class: 'note' }, 'ここに立った人より遠い人（小さく写る人）には話しかけなくなります。会場に置いたら最初にやってください。'),
@@ -198,6 +202,18 @@ export class Panel {
     this.renderStats();
     this.renderPhrases();
     this.checkOffline();
+  }
+
+  // 枠の色の見方。数字は今の設定から出す
+  legend() {
+    const s = this.settings.values;
+    const item = (cls, name, text) => el('li', {}, el('span', { class: `swatch ${cls}` }), el('b', {}, name), `　${text}`);
+    return el('div', {},
+      el('ul', { class: 'legend' },
+        item('far', '灰色の点線', `遠い人（枠が画面の ${s.nearPct}% 未満）。いないものとして扱い、話しかけない`),
+        item('near', '青', `反応する範囲の人（${s.nearPct}% 以上 ${s.approachPct}% 未満）。${s.dwellSec} 秒いるか、こっちを ${s.lookSec} 秒向いたら話しかける`),
+        item('close', '赤', `すぐ近くの人（${s.approachPct}% 以上＝接近しきい値）。待たずにすぐ話しかける`)),
+      el('p', { class: 'note' }, `・%は人の枠が画面に占める広さ。近いほど大きい（数字はデバッグ表示 ON で枠の上に出る）\n・境目は「反応する範囲」と「接近しきい値」で変えられる\n・一度範囲に入った人は、${Math.round(s.nearPct * 0.6)}%（境目の6割）まで下がっても青のまま（話しかけられて一歩下がっても続きを話すため）`));
   }
 
   // 立ってもらった位置での人の大きさを測り、「反応する範囲」にする
