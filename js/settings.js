@@ -2,6 +2,9 @@
 
 const SETTINGS_KEY = 'kuma-gaya:settings:v1';
 const STATS_KEY = 'kuma-gaya:stats:v1';
+// 保存形式の版。初期値の意味が変わったときに上げ、古い保存値を読み替える
+//   2：画面にインカメラ映像を出すようにしたので、カメラの初期値を背面→前面に
+const SCHEMA = 2;
 
 export const DEFAULTS = Object.freeze({
   intervalMs: 250,        // 検出間隔（250ms = 約4fps）
@@ -12,8 +15,8 @@ export const DEFAULTS = Object.freeze({
   followupSec: 6,         // 呼びかけ後、何秒残っていたら2段目を流すか（0で2段目なし）
   cooldownSec: 25,        // 話し終えてから次の呼びかけまでの休み
   volume: 90,             // 音量（%）
-  camera: 'environment',  // 'environment' = 背面 / 'user' = 前面
-  debug: false,           // デバッグ表示（OFF時は画面真っ黒）
+  camera: 'user',         // 'user' = 前面（インカメラ） / 'environment' = 背面
+  debug: false,           // デバッグ表示（状態・検出時間などの文字）
   speechFallback: true,   // 音声ファイルがないとき Web Speech API で読み上げる（テスト用）
   lookEnabled: true,      // こっちを向いたら反応する（待機中はあいさつ、呼びかけ後はすぐ2段目）
   lookSec: 0.5,           // 何秒こっちを向いていたら反応するか
@@ -47,6 +50,7 @@ export class Settings extends EventTarget {
     const stored = load(SETTINGS_KEY) || {};
     // 「反応する範囲」を足す前の保存値：接近しきい値が旧初期値 25% のままなら新しい初期値にする
     if (!('nearPct' in stored) && stored.approachPct === 25) delete stored.approachPct;
+    if ((stored._schema || 1) < 2 && stored.camera === 'environment') delete stored.camera;
     this.values = { ...DEFAULTS };
     for (const k of Object.keys(DEFAULTS)) {
       if (k in stored && typeof stored[k] === typeof DEFAULTS[k]) this.values[k] = stored[k];
@@ -56,7 +60,7 @@ export class Settings extends EventTarget {
   set(key, value) {
     if (!(key in DEFAULTS) || this.values[key] === value) return;
     this.values[key] = value;
-    save(SETTINGS_KEY, this.values);
+    save(SETTINGS_KEY, { ...this.values, _schema: SCHEMA });
     this.dispatchEvent(new CustomEvent('change', { detail: { key, value } }));
   }
 

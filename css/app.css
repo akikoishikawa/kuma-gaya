@@ -13,21 +13,19 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* カメラ映像と検出枠。デバッグOFFのときは見せない（映像の再生は続ける） */
+/* カメラ映像と検出結果（人の枠・顔の点）を全画面に表示 */
 #stage {
   position: fixed;
   inset: 0;
-  opacity: 0;
   pointer-events: none;
 }
-body.debug #stage { opacity: 1; }
 
 #video, #overlay {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover; /* 画面いっぱいに（はみ出た分は切れる）。映像と重ね描きは同じ大きさなのでずれない */
 }
 .mirror { transform: scaleX(-1); }
 

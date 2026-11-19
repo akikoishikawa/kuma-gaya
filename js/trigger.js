@@ -34,13 +34,6 @@ export class Trigger {
     this.faces = 0;
   }
 
-  // 顔を調べる必要があるか（発熱対策：要るときだけ顔検出を回す）
-  get wantsFaces() {
-    return this.settings.values.lookEnabled
-      && this.presentSince !== null
-      && (this.state === 'idle' || this.state === 'waitFollowup');
-  }
-
   update(now, boxes, frameW, frameH, faces = null) {
     const s = this.settings.values;
     const area = frameW * frameH || 1;

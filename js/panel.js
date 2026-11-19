@@ -13,10 +13,10 @@ const FIELDS = [
   { key: 'followupSec', label: '2段目までの待ち時間', min: 0, max: 30, step: 0.5, fmt: (v) => (v === 0 ? '2段目なし' : `${v} 秒`) },
   { key: 'cooldownSec', label: 'クールダウン', min: 0, max: 180, step: 1, fmt: (v) => `${v} 秒` },
   { key: 'volume', label: '音量', min: 0, max: 100, step: 1, fmt: (v) => `${v}%` },
-  { key: 'camera', label: '使用カメラ', type: 'select', options: [['environment', '背面'], ['user', '前面']] },
+  { key: 'camera', label: '使用カメラ', type: 'select', options: [['user', '前面（インカメラ）'], ['environment', '背面']] },
   { key: 'lookEnabled', label: 'こっちを向いたら反応（待機中はあいさつ、呼びかけ後はすぐ2段目）', type: 'checkbox' },
   { key: 'lookSec', label: 'こっちを向いている時間', min: 0.2, max: 3, step: 0.1, fmt: (v) => `${v.toFixed(1)} 秒` },
-  { key: 'debug', label: 'デバッグ表示（映像・検出枠・状態）', type: 'checkbox' },
+  { key: 'debug', label: 'デバッグ表示（状態・検出時間・枠の大きさなどの文字）', type: 'checkbox' },
   { key: 'speechFallback', label: '音声ファイルがないとき読み上げで代用（テスト用・本番はOFF）', type: 'checkbox' },
 ];
 

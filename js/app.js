@@ -70,6 +70,7 @@ startBtn.addEventListener('click', async () => {
   // ここまでは同期的に（タップの直後に）実行する必要がある
   player.unlock();
   requestWakeLock();
+  enterFullscreen();
 
   startBtn.disabled = true;
   startMsg.textContent = '準備中…（初回は少し時間がかかります）';
@@ -93,7 +94,19 @@ startBtn.addEventListener('click', async () => {
   loop();
 });
 
-// 顔検出は「こっちを向いた」反応のためだけに使う。初期化に失敗しても本体は止めない
+// 全画面にする。iPhone の Safari はページの全画面に対応していないので、
+// ホーム画面に追加したアプリとして開く（それで全画面になる）。対応している端末（PC・Android・iPad）だけ効く
+function enterFullscreen() {
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!req || document.fullscreenElement || document.webkitFullscreenElement) return;
+  try {
+    const p = req.call(el, { navigationUI: 'hide' });
+    if (p && p.catch) p.catch(() => {});
+  } catch { /* 非対応 */ }
+}
+
+// 顔検出は「こっちを向いた」反応と画面表示に使う。初期化に失敗しても本体は止めない
 async function initFaces() {
   try {
     await faceWatcher.init({ delegate: settings.values.delegate });
@@ -184,21 +197,23 @@ function loop() {
       const minRatio = settings.values.nearPct / 100;
       for (const b of boxes) b.ratio = Math.min(1, (b.width * b.height) / area);
       near = boxes.filter((b) => b.ratio >= minRatio);
-      // 近くに人がいて、向きを見る意味がある状態のときだけ顔を調べる
-      if (near.length > 0 && trigger.wantsFaces && faceWatcher.ready) {
-        faces = faceWatcher.detect(video, near, settings.values.lookTolerance);
+      // 人が写っていれば顔を調べる（画面に点を描くため、遠い人も含めて大きい順に 2 人まで）
+      if (boxes.length > 0 && faceWatcher.ready) {
+        faces = faceWatcher.detect(video, boxes, settings.values.lookTolerance);
       }
     } catch (e) {
       console.error(e);
     }
     nearest = boxes.reduce((m, b) => Math.max(m, b.ratio || 0), 0);
-    trigger.update(t0, near, video.videoWidth, video.videoHeight, faces);
+    // 反応に使うのは範囲内の人の顔だけ
+    const nearFaces = faces && faces.filter((f) => near.includes(f.person));
+    trigger.update(t0, near, video.videoWidth, video.videoHeight, nearFaces);
     if (lastTick) {
       const inst = 1000 / (t0 - lastTick);
       fps = fps ? fps * 0.8 + inst * 0.2 : inst;
     }
     lastTick = t0;
-    if (settings.values.debug) render(boxes, near.length, faces, t0);
+    render(boxes, near.length, faces, t0);
   }
   const wait = settings.values.intervalMs - (performance.now() - t0);
   timer = setTimeout(loop, Math.max(10, wait));
@@ -211,8 +226,10 @@ function applyDebug() {
   const on = settings.values.debug;
   document.body.classList.toggle('debug', on);
   statusEl.hidden = !on || !started;
-  if (!on) ctx2d.clearRect(0, 0, canvas.width, canvas.height);
 }
+
+// 顔の 6 点（右目・左目・鼻先・口・右耳・左耳）をつなぐ線
+const FACE_LINES = [[0, 1], [0, 2], [1, 2], [2, 3], [0, 4], [1, 5]];
 
 function render(boxes, nearCount, faces, now) {
   const vw = video.videoWidth;
@@ -224,8 +241,9 @@ function render(boxes, nearCount, faces, now) {
   ctx2d.clearRect(0, 0, vw, vh);
   const threshold = settings.values.approachPct / 100;
   const nearMin = settings.values.nearPct / 100;
-  ctx2d.lineWidth = Math.max(2, vw / 200);
-  ctx2d.font = `${Math.round(vh / 22)}px sans-serif`;
+  const unit = Math.max(vw, vh) / 640; // 映像の大きさに合わせて線と文字の太さを決める
+  ctx2d.lineWidth = 3 * unit;
+  ctx2d.font = `bold ${Math.round(18 * unit)}px sans-serif`;
   // 枠の色：遠い（無視）＝灰の点線、範囲内＝水色、接近＝赤
   for (const b of boxes) {
     const r = b.ratio ?? (b.width * b.height) / (vw * vh);
@@ -234,6 +252,7 @@ function render(boxes, nearCount, faces, now) {
     ctx2d.setLineDash(far ? [ctx2d.lineWidth * 3, ctx2d.lineWidth * 3] : []);
     ctx2d.strokeRect(b.originX, b.originY, b.width, b.height);
     ctx2d.setLineDash([]);
+    if (!settings.values.debug) continue; // 枠の大きさの数字はデバッグ表示のときだけ
     const label = `${Math.round(r * 100)}%${far ? ' 遠い' : ''} / ${Math.round(b.score * 100)}`;
     ctx2d.fillStyle = ctx2d.strokeStyle;
     // 前面カメラは canvas ごと左右反転しているので文字も反転して書く
@@ -246,24 +265,37 @@ function render(boxes, nearCount, faces, now) {
       ctx2d.fillText(label, b.originX, b.originY - 6);
     }
   }
-  // 顔：正面なら黄、横向きなら灰。目と鼻に点
+  // 顔：6 点を線でつないで描く。正面なら黄、横向きなら白
   for (const f of faces || []) {
-    ctx2d.strokeStyle = f.facing ? '#ffd23c' : '#888';
-    ctx2d.strokeRect(f.box.originX, f.box.originY, f.box.width, f.box.height);
-    ctx2d.fillStyle = ctx2d.strokeStyle;
-    for (const k of f.keypoints.slice(0, 3)) {
+    const color = f.facing ? '#ffd23c' : '#e8e8e8';
+    const kp = f.keypoints;
+    ctx2d.strokeStyle = color;
+    ctx2d.lineWidth = 2 * unit;
+    ctx2d.beginPath();
+    for (const [a, b] of FACE_LINES) {
+      if (!kp[a] || !kp[b]) continue;
+      ctx2d.moveTo(kp[a].x, kp[a].y);
+      ctx2d.lineTo(kp[b].x, kp[b].y);
+    }
+    ctx2d.stroke();
+    for (const [i, k] of kp.entries()) {
       ctx2d.beginPath();
-      ctx2d.arc(k.x, k.y, ctx2d.lineWidth * 1.5, 0, Math.PI * 2);
+      ctx2d.arc(k.x, k.y, (i < 3 ? 5 : 4) * unit, 0, Math.PI * 2);
+      ctx2d.fillStyle = color;
       ctx2d.fill();
+      ctx2d.lineWidth = 1.5 * unit;
+      ctx2d.strokeStyle = '#000';
+      ctx2d.stroke();
     }
   }
+  if (!settings.values.debug) return;
   const d = trigger.describe(now);
   const s = settings.values;
   statusEl.textContent = [
     `状態　${d.label}`,
     `人　　範囲内 ${nearCount} 人／遠い ${boxes.length - nearCount} 人　最大 ${Math.round(nearest * 100)}%（範囲 ${s.nearPct}%〜・接近 ${s.approachPct}%）`,
     `滞在　${d.stay.toFixed(1)} / ${s.dwellSec} 秒`,
-    `顔　　${s.lookEnabled ? `${faces ? `${d.faces} 個` : '調べていない'}　正面 ${d.look.toFixed(1)} / ${s.lookSec} 秒${faces && faces[0] ? `（ずれ ${faces[0].offset.toFixed(2)}／許容 ${s.lookTolerance}）` : ''}` : 'OFF'}`,
+    `顔　　${s.lookEnabled ? `${faces ? `${faces.length} 個（範囲内 ${d.faces}）` : '調べていない'}　正面 ${d.look.toFixed(1)} / ${s.lookSec} 秒${faces && faces[0] ? `（ずれ ${faces[0].offset.toFixed(2)}／許容 ${s.lookTolerance}）` : ''}` : 'OFF'}`,
     `検出　人 ${detector.lastMs.toFixed(0)} ms　顔 ${faces ? faceWatcher.lastMs.toFixed(0) : '-'} ms　${fps.toFixed(1)} fps（${detector.delegate}）`,
     `映像　${vw}×${vh}　音声 ${player.contextState}　画面ロック防止 ${wakeState}`,
   ].join('\n');

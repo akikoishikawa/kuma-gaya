@@ -3,7 +3,7 @@
 //
 // short range は近い顔向けのモデルで、画面の中で顔が小さいと見つからない。
 // そこで、人の枠の上のほう（頭のあたり）を切り出して拡大してから探す。
-// 発熱を抑えるため、人がいるときだけ呼ぶ（app.js 側で判断）。
+// 発熱を抑えるため、人がいるときだけ呼ぶ（app.js 側で判断）。結果は画面にも描く。
 
 const BASE = new URL('../', import.meta.url);
 const FILESET = {
@@ -69,7 +69,7 @@ export class FaceWatcher {
   }
 
   // 人の枠ごとに頭のあたりを切り出して顔を探す。
-  // 戻り値：[{ box, keypoints（映像のピクセル座標）, offset, facing }]
+  // 戻り値：[{ box, keypoints（映像のピクセル座標）, offset, facing, person（元の人の枠） }]
   detect(video, personBoxes, tolerance) {
     if (!this.fd) return [];
     const fw = video.videoWidth;
@@ -97,6 +97,7 @@ export class FaceWatcher {
           offset,
           facing: offset <= tolerance,
           region: r,
+          person: pb,
         });
       }
     }
