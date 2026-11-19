@@ -197,17 +197,15 @@ function loop() {
       const minRatio = settings.values.nearPct / 100;
       for (const b of boxes) b.ratio = Math.min(1, (b.width * b.height) / area);
       near = boxes.filter((b) => b.ratio >= minRatio);
-      // 人が写っていれば顔を調べる（画面に点を描くため、遠い人も含めて大きい順に 2 人まで）
-      if (boxes.length > 0 && faceWatcher.ready) {
-        faces = faceWatcher.detect(video, boxes, settings.values.lookTolerance);
+      // 範囲内に人がいるときだけ顔を調べる（発熱対策）。画面の顔の点もそのときだけ出る
+      if (near.length > 0 && faceWatcher.ready) {
+        faces = faceWatcher.detect(video, near, settings.values.lookTolerance);
       }
     } catch (e) {
       console.error(e);
     }
     nearest = boxes.reduce((m, b) => Math.max(m, b.ratio || 0), 0);
-    // 反応に使うのは範囲内の人の顔だけ
-    const nearFaces = faces && faces.filter((f) => near.includes(f.person));
-    trigger.update(t0, near, video.videoWidth, video.videoHeight, nearFaces);
+    trigger.update(t0, near, video.videoWidth, video.videoHeight, faces);
     if (lastTick) {
       const inst = 1000 / (t0 - lastTick);
       fps = fps ? fps * 0.8 + inst * 0.2 : inst;
@@ -295,7 +293,7 @@ function render(boxes, nearCount, faces, now) {
     `状態　${d.label}`,
     `人　　範囲内 ${nearCount} 人／遠い ${boxes.length - nearCount} 人　最大 ${Math.round(nearest * 100)}%（範囲 ${s.nearPct}%〜・接近 ${s.approachPct}%）`,
     `滞在　${d.stay.toFixed(1)} / ${s.dwellSec} 秒`,
-    `顔　　${s.lookEnabled ? `${faces ? `${faces.length} 個（範囲内 ${d.faces}）` : '調べていない'}　正面 ${d.look.toFixed(1)} / ${s.lookSec} 秒${faces && faces[0] ? `（ずれ ${faces[0].offset.toFixed(2)}／許容 ${s.lookTolerance}）` : ''}` : 'OFF'}`,
+    `顔　　${s.lookEnabled ? `${faces ? `${d.faces} 個` : '調べていない'}　正面 ${d.look.toFixed(1)} / ${s.lookSec} 秒${faces && faces[0] ? `（ずれ ${faces[0].offset.toFixed(2)}／許容 ${s.lookTolerance}）` : ''}` : 'OFF'}`,
     `検出　人 ${detector.lastMs.toFixed(0)} ms　顔 ${faces ? faceWatcher.lastMs.toFixed(0) : '-'} ms　${fps.toFixed(1)} fps（${detector.delegate}）`,
     `映像　${vw}×${vh}　音声 ${player.contextState}　画面ロック防止 ${wakeState}`,
   ].join('\n');
