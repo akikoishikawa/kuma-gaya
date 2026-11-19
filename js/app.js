@@ -13,6 +13,7 @@ const errorEl = $('error');
 const startScreen = $('start');
 const startBtn = $('start-btn');
 const startMsg = $('start-msg');
+const bubbleEl = $('bubble');
 
 const settings = new Settings();
 const stats = new Stats();
@@ -28,6 +29,9 @@ let wakeLock = null;
 let wakeState = '未取得';
 let lastTick = 0;
 let fps = 0;
+let lastFaces = [];   // 直近に見つかった顔（顔検出は数回に1回しか結果が変わらないので、一瞬見失っても少し残す）
+let lastFacesAt = -Infinity;
+const FACE_KEEP_MS = 500;
 let nearest = 0; // 直近フレームで一番大きい人の枠の面積比（遠い人も含む。範囲の合わせ込み用）
 
 // ---- Service Worker（オフライン用）。?nosw を付けると登録しない（開発用）
@@ -211,8 +215,14 @@ function loop() {
       fps = fps ? fps * 0.8 + inst * 0.2 : inst;
     }
     lastTick = t0;
-    render(boxes, near.length, faces, t0);
+    if (faces && faces.length) {
+      lastFaces = faces;
+      lastFacesAt = t0;
+    }
+    const shown = faces && faces.length ? faces : (near.length && t0 - lastFacesAt < FACE_KEEP_MS ? lastFaces : []);
+    render(boxes, near.length, faces, shown, t0);
   }
+  updateBubble();
   const wait = settings.values.intervalMs - (performance.now() - t0);
   timer = setTimeout(loop, Math.max(10, wait));
 }
@@ -226,10 +236,74 @@ function applyDebug() {
   statusEl.hidden = !on || !started;
 }
 
-// 顔の 6 点（右目・左目・鼻先・口・右耳・左耳）をつなぐ線
-const FACE_LINES = [[0, 1], [0, 2], [1, 2], [2, 3], [0, 4], [1, 5]];
+// ---- セリフの吹き出し：再生中のフレーズの文字を出す
+let bubbleId = null;
+function updateBubble() {
+  const cur = player.current;
+  const id = cur ? cur.id : null;
+  if (id === bubbleId) return;
+  bubbleId = id;
+  if (cur) bubbleEl.textContent = cur.text;
+  bubbleEl.hidden = !cur;
+}
+// 設定パネルのテスト再生でも出るよう、検出ループとは別にも見る
+setInterval(updateBubble, 150);
 
-function render(boxes, nearCount, faces, now) {
+// ---- くまに変身：顔の点（右目・左目・鼻先・口）からクマ耳と鼻を重ねる
+const BEAR = { fur: '#8a5a32', furDark: '#5e3a1c', inner: '#e9b48a', muzzle: '#f3dcc0', nose: '#2b1a10' };
+
+function drawBear(kp) {
+  const [eyeR, eyeL, nose, mouth] = kp;
+  if (!eyeR || !eyeL || !nose) return;
+  const ex = eyeL.x - eyeR.x;
+  const ey = eyeL.y - eyeR.y;
+  const d = Math.hypot(ex, ey); // 両目の間隔を物差しにする
+  if (d < 4) return;
+  const ux = ex / d;
+  const uy = ey / d; // 目を結ぶ向き（単位ベクトル）
+  const mx = (eyeR.x + eyeL.x) / 2;
+  const my = (eyeR.y + eyeL.y) / 2;
+  // 頭の上の向き：目の向きに直交し、口から離れる側
+  let vx = uy;
+  let vy = -ux;
+  const ref = mouth || nose;
+  if ((ref.x - mx) * vx + (ref.y - my) * vy > 0) { vx = -vx; vy = -vy; }
+  const angle = Math.atan2(uy, ux);
+  const at = (side, up) => [mx + ux * side * d + vx * up * d, my + uy * side * d + vy * up * d];
+
+  // 耳（頭の上の左右）
+  for (const side of [-1.15, 1.15]) {
+    const [cx, cy] = at(side, 1.65);
+    circle(cx, cy, 0.72 * d, BEAR.fur, BEAR.furDark, 0.1 * d);
+    circle(cx, cy, 0.4 * d, BEAR.inner);
+  }
+  // 鼻のまわり（マズル）と鼻
+  const nx = nose.x;
+  const ny = nose.y;
+  const mzx = ref === mouth ? (nose.x * 2 + mouth.x) / 3 : nose.x;
+  const mzy = ref === mouth ? (nose.y * 2 + mouth.y) / 3 : nose.y;
+  ellipse(mzx, mzy, 0.62 * d, 0.46 * d, angle, BEAR.muzzle, BEAR.furDark, 0.05 * d);
+  ellipse(nx, ny, 0.3 * d, 0.2 * d, angle, BEAR.nose);
+  ellipse(nx - ux * 0.09 * d + vx * 0.07 * d, ny - uy * 0.09 * d + vy * 0.07 * d, 0.09 * d, 0.05 * d, angle, 'rgba(255,255,255,.55)');
+}
+
+function circle(x, y, r, fill, stroke, width) {
+  ellipse(x, y, r, r, 0, fill, stroke, width);
+}
+
+function ellipse(x, y, rx, ry, rot, fill, stroke, width) {
+  ctx2d.beginPath();
+  ctx2d.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2);
+  ctx2d.fillStyle = fill;
+  ctx2d.fill();
+  if (stroke) {
+    ctx2d.lineWidth = width;
+    ctx2d.strokeStyle = stroke;
+    ctx2d.stroke();
+  }
+}
+
+function render(boxes, nearCount, faces, shownFaces, now) {
   const vw = video.videoWidth;
   const vh = video.videoHeight;
   if (canvas.width !== vw || canvas.height !== vh) {
@@ -240,7 +314,7 @@ function render(boxes, nearCount, faces, now) {
   const threshold = settings.values.approachPct / 100;
   const nearMin = settings.values.nearPct / 100;
   const unit = Math.max(vw, vh) / 640; // 映像の大きさに合わせて線と文字の太さを決める
-  ctx2d.lineWidth = 3 * unit;
+  ctx2d.lineWidth = 8 * unit;
   ctx2d.font = `bold ${Math.round(18 * unit)}px sans-serif`;
   // 枠の色：遠い（無視）＝灰の点線、範囲内＝水色、接近＝赤
   for (const b of boxes) {
@@ -257,35 +331,14 @@ function render(boxes, nearCount, faces, now) {
     if (video.classList.contains('mirror')) {
       ctx2d.save();
       ctx2d.scale(-1, 1);
-      ctx2d.fillText(label, -(b.originX + b.width), b.originY - 6);
+      ctx2d.fillText(label, -(b.originX + b.width), b.originY - 10 * unit);
       ctx2d.restore();
     } else {
-      ctx2d.fillText(label, b.originX, b.originY - 6);
+      ctx2d.fillText(label, b.originX, b.originY - 10 * unit);
     }
   }
-  // 顔：6 点を線でつないで描く。正面なら黄、横向きなら白
-  for (const f of faces || []) {
-    const color = f.facing ? '#ffd23c' : '#e8e8e8';
-    const kp = f.keypoints;
-    ctx2d.strokeStyle = color;
-    ctx2d.lineWidth = 2 * unit;
-    ctx2d.beginPath();
-    for (const [a, b] of FACE_LINES) {
-      if (!kp[a] || !kp[b]) continue;
-      ctx2d.moveTo(kp[a].x, kp[a].y);
-      ctx2d.lineTo(kp[b].x, kp[b].y);
-    }
-    ctx2d.stroke();
-    for (const [i, k] of kp.entries()) {
-      ctx2d.beginPath();
-      ctx2d.arc(k.x, k.y, (i < 3 ? 5 : 4) * unit, 0, Math.PI * 2);
-      ctx2d.fillStyle = color;
-      ctx2d.fill();
-      ctx2d.lineWidth = 1.5 * unit;
-      ctx2d.strokeStyle = '#000';
-      ctx2d.stroke();
-    }
-  }
+  // 顔：クマ耳と鼻を重ねる（くまに変身する鏡）
+  for (const f of shownFaces) drawBear(f.keypoints);
   if (!settings.values.debug) return;
   const d = trigger.describe(now);
   const s = settings.values;

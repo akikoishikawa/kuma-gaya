@@ -29,6 +29,48 @@ html, body {
 }
 .mirror { transform: scaleX(-1); }
 
+/* クマが話している間のセリフの吹き出し（画面の上のほう） */
+#bubble {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 20px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 32px);
+  padding: 16px 22px;
+  background: #fffaf2;
+  color: #3a2614;
+  border: 4px solid #6b4423;
+  border-radius: 28px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .35);
+  font-size: clamp(22px, 6.4vw, 44px);
+  font-weight: 800;
+  line-height: 1.4;
+  text-align: center;
+  text-wrap: balance;
+  pointer-events: none;
+  animation: bubble-in .25s ease-out;
+}
+#bubble[hidden] { display: none; }
+/* 吹き出しのしっぽ（下向き） */
+#bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -22px;
+  transform: translateX(-50%);
+  border: 13px solid transparent;
+  border-top: 13px solid #6b4423;
+  border-bottom: 0;
+  width: 0;
+  height: 9px;
+}
+@keyframes bubble-in {
+  /* 透明度は変えない（途中で止まっても読めるように） */
+  from { transform: translateX(-50%) scale(.85); }
+  to { transform: translateX(-50%) scale(1); }
+}
+
 #status {
   position: fixed;
   left: calc(env(safe-area-inset-left) + 8px);
