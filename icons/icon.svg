@@ -22,12 +22,12 @@
   <ellipse cx="256" cy="232" rx="158" ry="146" fill="#141414"/>
 
   <!-- 目（黒い顔に溶けないよう白いふちと光） -->
-  <circle cx="196" cy="214" r="21" fill="#fbf6ee"/>
-  <circle cx="316" cy="214" r="21" fill="#fbf6ee"/>
-  <circle cx="199" cy="218" r="13" fill="#141414"/>
-  <circle cx="313" cy="218" r="13" fill="#141414"/>
-  <circle cx="204" cy="212" r="4.5" fill="#fff"/>
-  <circle cx="318" cy="212" r="4.5" fill="#fff"/>
+  <circle cx="196" cy="216" r="20" fill="#fbf6ee"/>
+  <circle cx="316" cy="216" r="20" fill="#fbf6ee"/>
+  <circle cx="197" cy="218" r="17" fill="#141414"/>
+  <circle cx="315" cy="218" r="17" fill="#141414"/>
+  <circle cx="203" cy="211" r="5.5" fill="#fff"/>
+  <circle cx="321" cy="211" r="5.5" fill="#fff"/>
 
   <!-- 鼻まわりと鼻 -->
   <ellipse cx="256" cy="290" rx="62" ry="46" fill="#2c2c2c"/>
