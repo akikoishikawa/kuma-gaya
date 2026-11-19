@@ -250,7 +250,8 @@ function updateBubble() {
 setInterval(updateBubble, 150);
 
 // ---- くまに変身：顔の点（右目・左目・鼻先・口）からクマ耳と鼻を重ねる
-const BEAR = { fur: '#8a5a32', furDark: '#5e3a1c', inner: '#e9b48a', muzzle: '#f3dcc0', nose: '#2b1a10' };
+// ツキノワグマらしく、耳も鼻まわりも黒。黒い髪や背景に溶けないよう、ふちだけ薄い灰色にする
+const BEAR = { fur: '#111', furDark: '#555', inner: '#2b2b2b', muzzle: '#111', nose: '#000' };
 
 function drawBear(kp) {
   const [eyeR, eyeL, nose, mouth] = kp;
